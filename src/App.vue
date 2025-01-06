@@ -36,7 +36,16 @@
       <!-- Select Scenario Type -->
       <div>
         <label for="scenario">Scenario Type:</label>
-        <select v-model="scenarioType" id="scenario">
+        <select v-model="scenarioType" id="scenarioType">
+          <option value="jay">jay</option>
+          <option value="ray">ray</option>
+        </select>
+      </div>
+
+      <!-- Select Testing Type -->
+      <div>
+        <label for="testing">Testing Type:</label>
+        <select v-model="testingType" id="testingType">
           <option value="positive">Positive</option>
           <option value="negative">Negative</option>
         </select>
@@ -71,7 +80,8 @@ export default {
       selectedEvent: "",
       fields: [], // This will hold the fields for the selected event
       jsonStructure: "standard", // Default JSON structure
-      scenarioType: "positive", // Default scenario type
+      scenarioType: "jay", // Default scenario type
+      testingType: "positive", // Default testing type
     };
   },
   methods: {
@@ -97,17 +107,25 @@ export default {
       const requestBody = {
         event: this.selectedEvent,
         payload: payload,
-        scenario: this.scenarioType,
+        scenarioType: this.scenarioType,
+        testingType: this.testingType,
       };
 
+      console.log("Received event:", this.selectedEvent); //debug log
+      console.log("Received scenarioType:", this.scenarioType);  // Debug log
+      console.log("Received testingType:", this.testingType);    // Debug log
       try {
-        const response = await fetch("http://localhost:8080/overwrite", {
+        const response = await fetch("http://localhost:8081/overwrite", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(requestBody),
         });
-        await response.json();
-        alert("Payload overwritten successfully!");
+        if (!response.ok) {
+          const errorData = await response.json();
+          alert(errorData.error || "Failed to send payloads.");
+        } else {
+          alert("Payloads overwritten successfully!");
+        }
       } catch (error) {
         console.error(error);
         alert("Failed to send payload.");
