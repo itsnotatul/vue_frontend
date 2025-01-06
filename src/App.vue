@@ -15,13 +15,31 @@
       <div v-if="fields.length">
         <h3>Configure Payload</h3>
         <div v-for="(field, index) in fields" :key="index" class="field-row">
-          <label :for="field.name">{{ field.name }}:</label>
-          <input
-            type="text"
-            v-model="field.value"
-            :id="field.name"
-            :placeholder="field.defaultValue"
-          />
+          <template v-if="!field.fields">
+            <label :for="field.name">{{ field.name }}:</label>
+            <input
+              type="text"
+              v-model="field.value"
+              :id="field.name"
+              :placeholder="field.defaultValue"
+            />
+          </template>
+
+          <!-- Handle Nested Fields -->
+          <template v-else>
+            <div>
+              <h4>{{ field.name }}</h4>
+              <div class="nested-field" v-for="(nestedField, nestedIndex) in field.fields" :key="nestedIndex">
+                <label :for="nestedField.name">{{ nestedField.name }}:</label>
+                <input
+                  type="text"
+                  v-model="nestedField.value"
+                  :id="nestedField.name"
+                  :placeholder="nestedField.defaultValue"
+                />
+              </div>
+            </div>
+          </template>
         </div>
       </div>
 
@@ -67,6 +85,13 @@ export default {
           fields: [
             { name: "Field1", defaultValue: "Default1" },
             { name: "Field2", defaultValue: "Default2" },
+            {
+              name: "NestedField",
+              fields: [
+                { name: "NestedKey1", defaultValue: "NestedDefault1" },
+                { name: "NestedKey2", defaultValue: "NestedDefault2" },
+              ],
+            },
           ],
         },
         {
@@ -88,21 +113,37 @@ export default {
     loadEventFields() {
       const event = this.events.find((e) => e.name === this.selectedEvent);
       if (event) {
-        // Load the fields and set their default values
-        this.fields = event.fields.map((field) => ({
-          name: field.name,
-          value: field.defaultValue, // Set the default value initially
-          defaultValue: field.defaultValue,
-        }));
+        this.fields = event.fields.map((field) => {
+          if (field.fields) {
+            // Initialize nested fields
+            return {
+              ...field,
+              fields: field.fields.map((nestedField) => ({
+                ...nestedField,
+                value: nestedField.defaultValue,
+              })),
+            };
+          }
+          return { ...field, value: field.defaultValue };
+        });
       } else {
         this.fields = []; // Clear fields if no event is selected
       }
     },
     async sendPayload() {
-      const payload = this.fields.reduce((acc, field) => {
-        acc[field.name] = field.value;
-        return acc;
-      }, {});
+      const buildPayload = (fields) => {
+        return fields.reduce((acc, field) => {
+          if (field.fields) {
+            // Recursively handle nested fields
+            acc[field.name] = buildPayload(field.fields);
+          } else {
+            acc[field.name] = field.value;
+          }
+          return acc;
+        }, {});
+      };
+
+      const payload = buildPayload(this.fields);
 
       const requestBody = {
         event: this.selectedEvent,
@@ -111,9 +152,6 @@ export default {
         testingType: this.testingType,
       };
 
-      console.log("Received event:", this.selectedEvent); //debug log
-      console.log("Received scenarioType:", this.scenarioType);  // Debug log
-      console.log("Received testingType:", this.testingType);    // Debug log
       try {
         const response = await fetch("http://localhost:8081/overwrite", {
           method: "POST",
